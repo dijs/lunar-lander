@@ -43,13 +43,29 @@ function text(str, x, y, s = 10) {
   ctx.fillText(str, x, y);
 }
 
+const big = 179424673 + Math.random() * 776531401;
+
+function random(seed) {
+  return (big * seed ** seed) % 1;
+}
+
 function render() {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, width, height);
 
+  ctx.fillStyle = 'white';
+
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      const u = x * height + y;
+      if (u % 23 === 0 && random(x / width) > 0.9 && random(y / height) > 0.9) {
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
   ctx.strokeStyle = 'white';
   ctx.beginPath();
-  ctx.fillStyle = 'white';
   const u = height - 20;
   ctx.rect(10, 10, 20, u);
   const e = u * (lander.fuel / maxFuel);
