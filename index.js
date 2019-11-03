@@ -30,7 +30,7 @@ const maxThrust = 3;
 
 let thrust = 0;
 let flameLength = 0;
-let ticks = 0;
+let ticks = 1;
 let score = 0;
 
 const mass = 1;
@@ -51,7 +51,7 @@ function random(seed) {
   return (big * seed ** seed) % 1;
 }
 
-function render() {
+function render(ticks) {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, width, height);
 
@@ -81,7 +81,12 @@ function render() {
     platformHeight
   );
 
-  text(`Alt: ${(height - platformHeight - lander.y) | 0}`, width - 50, 20, 10);
+  text(
+    `Alt: ${(height - platformHeight - lander.y - lander.h / 2) | 0}`,
+    width - 50,
+    20,
+    10
+  );
   text(`Horz: ${(lander.vx * 100) | 0}`, width - 50, 30, 10);
   text(`Vert: ${(lander.vy * 100) | 0}`, width - 50, 40, 10);
   text(`Spin: ${lander.rot}`, width - 50, 50, 10);
@@ -122,7 +127,8 @@ const distLimit = 13;
 function update() {
   if (over) return;
 
-  if (lander.y + lander.h / 2 >= height - platformHeight) {
+  const landed = lander.y + lander.h / 2 >= height - platformHeight;
+  if (landed) {
     over = true;
 
     console.log('vel:', lander.vx + lander.vy);
@@ -170,9 +176,10 @@ function update() {
 }
 
 function gameLoop() {
-  update(++ticks);
-  render();
+  update(ticks);
+  render(ticks);
   setTimeout(gameLoop);
+  ticks++;
 }
 
 gameLoop();
