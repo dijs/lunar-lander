@@ -4,8 +4,6 @@ const height = 400;
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
-// Score
-
 const maxFuel = 800;
 
 const lander = {
@@ -31,8 +29,12 @@ let win = false;
 const maxThrust = 3;
 
 let thrust = 0;
+let flameLength = 0;
+let ticks = 0;
+let score = 0;
+
 const mass = 1;
-const gravity = 0.5; // 1.62
+const gravity = 0.5;
 
 let landing = 60 + Math.random() * (width - 60);
 let platformWidth = 50;
@@ -85,7 +87,7 @@ function render() {
   text(`Spin: ${lander.rot}`, width - 50, 50, 10);
 
   if (over) {
-    text(win ? 'Win!' : 'Fail', width / 2, height / 2, 50);
+    text(win ? `Win! (${score} pts)` : 'Fail', width / 2, height / 2, 50);
   }
 
   ctx.save();
@@ -105,7 +107,7 @@ function render() {
   if (thrust > 0) {
     ctx.beginPath();
     ctx.moveTo(lander.x - 4, lander.y);
-    ctx.lineTo(lander.x, lander.y + 6);
+    ctx.lineTo(lander.x, lander.y + flameLength);
     ctx.lineTo(lander.x + 4, lander.y);
     ctx.fill();
   }
@@ -113,24 +115,39 @@ function render() {
   ctx.restore();
 }
 
+const velLimit = 0.11;
+const angleLimit = 0.11;
+const distLimit = 13;
+
 function update() {
   if (over) return;
 
   if (lander.y + lander.h / 2 >= height - platformHeight) {
     over = true;
+
     console.log('vel:', lander.vx + lander.vy);
     console.log('rot:', lander.rot);
     console.log('land:', Math.abs(lander.x - landing));
-    const slow = lander.vy + lander.vx < 0.1;
-    const upright = Math.abs(lander.rot) < 0.1;
-    const onPlatform = Math.abs(lander.x - landing) < 13;
+
+    const vel = lander.vy + lander.vx;
+    const angle = Math.abs(lander.rot);
+    const dist = Math.abs(lander.x - landing);
+
+    const slow = vel < velLimit;
+    const upright = angle < angleLimit;
+    const onPlatform = dist < distLimit;
+
     win = slow && upright && onPlatform;
+    const s = vel / velLimit + angle / angleLimit + dist / distLimit;
+    score = Math.round(s * -33.33 + 100) + lander.fuel;
   }
 
   if (keys[UP] && lander.fuel > 0) {
     thrust = maxThrust;
+    flameLength = Math.min(flameLength + 1, 13 + (ticks % 7));
     lander.fuel--;
   } else {
+    flameLength = 0;
     thrust = 0;
   }
 
@@ -153,7 +170,7 @@ function update() {
 }
 
 function gameLoop() {
-  update();
+  update(++ticks);
   render();
   setTimeout(gameLoop);
 }
