@@ -6,7 +6,7 @@ const ctx = canvas.getContext('2d');
 
 const maxFuel = 800;
 
-const lander = {
+let lander = {
   x: 0,
   y: 50,
   w: 16,
@@ -26,7 +26,7 @@ const RIGHT = 39;
 let over = false;
 let win = false;
 
-const maxThrust = 3;
+const maxThrust = 3; // 3
 
 let thrust = 0;
 let flameLength = 0;
@@ -34,11 +34,31 @@ let ticks = 1;
 let score = 0;
 
 const mass = 1;
-const gravity = 0.5;
+const gravity = 0.5; //0.5
 
 let landing = 60 + Math.random() * (width - 60);
 let platformWidth = 50;
 let platformHeight = 10;
+
+function reset() {
+  lander = {
+    x: 0,
+    y: 50,
+    w: 16,
+    h: 16,
+    vx: 0.5,
+    vy: 0,
+    rot: -Math.PI / 2, // 0
+    fuel: maxFuel
+  };
+  over = false;
+  win = false;
+  landing = 60 + Math.random() * (width - 60);
+  thrust = 0;
+  flameLength = 0;
+  ticks = 1;
+  score = 0;
+}
 
 function text(str, x, y, s = 10) {
   ctx.font = s + 'px serif';
@@ -127,6 +147,11 @@ const distLimit = 13;
 function update() {
   if (over) return;
 
+  if (lander.x < 0 || lander.x > canvas.width || lander.y < 0) {
+    over = true;
+    win = false;
+  }
+
   const landed = lander.y + lander.h / 2 >= height - platformHeight;
   if (landed) {
     over = true;
@@ -186,3 +211,88 @@ gameLoop();
 
 document.addEventListener('keydown', e => (keys[e.which] = true));
 document.addEventListener('keyup', e => (keys[e.which] = false));
+
+// Actions for AI
+
+function engageThruster() {
+  keys[UP] = true;
+}
+
+function disengageThruster() {
+  keys[UP] = false;
+}
+
+function rotateLeft() {
+  keys[LEFT] = true;
+}
+
+function rotateRight() {
+  keys[RIGHT] = true;
+}
+
+function stopRotating() {
+  keys[LEFT] = false;
+  keys[RIGHT] = false;
+}
+
+const actions = {
+  0: engageThruster,
+  1: disengageThruster,
+  2: rotateLeft,
+  3: rotateRight,
+  4: stopRotating
+};
+
+// create an environment object
+var env = {};
+env.getNumStates = function() {
+  return 7;
+};
+env.getMaxNumActions = function() {
+  return 5;
+};
+
+let prevScore = 0;
+
+// create the DQN agent
+var spec = { alpha: 0.01 }; // see full options on DQN page
+agent = new RL.DQNAgent(env, spec);
+
+// agent.fromJSON(JSON.parse(data));
+
+setInterval(function() {
+  // start the learning loop
+  var action = agent.act([
+    lander.rot,
+    lander.x,
+    lander.y,
+    lander.fuel,
+    lander.vx,
+    lander.vy,
+    landing
+  ]);
+
+  actions[action]();
+
+  const vel = lander.vy + lander.vx;
+  const angle = Math.abs(lander.rot);
+  const dist = Math.abs(lander.x - landing);
+
+  const a = vel - velLimit;
+  const b = angle - angleLimit;
+  const c = dist - distLimit;
+
+  const score = Math.sqrt(a * a + b * b + c * c);
+
+  const reward = Math.sign(score - prevScore) * 0.1;
+
+  console.log(reward);
+
+  prevScore = score;
+
+  agent.learn(reward);
+
+  if (over) {
+    reset();
+  }
+}, 100);
