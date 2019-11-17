@@ -1,12 +1,21 @@
-const width = 600;
-const height = 400;
-
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
-const maxFuel = 1000;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-const lander = {
+const width = canvas.width;
+const height = canvas.height;
+
+let thrust = 0;
+let flameLength = 0;
+let ticks = 1;
+let score = 0;
+let level = 1;
+let gravity = 0.7;
+let maxFuel = 2000;
+
+let lander = {
   x: 0,
   y: 50,
   w: 16,
@@ -27,14 +36,26 @@ let over = false;
 let win = false;
 
 const maxThrust = 3;
-
-let thrust = 0;
-let flameLength = 0;
-let ticks = 1;
-let score = 0;
-
 const mass = 1;
-const gravity = 0.5;
+
+function nextLevel() {
+  maxFuel *= 0.9;
+  gravity += 0.1;
+  lander = {
+    x: 0,
+    y: 50,
+    w: 16,
+    h: 16,
+    vx: 0.5,
+    vy: 0,
+    rot: -Math.PI / 2,
+    fuel: maxFuel
+  };
+  ticks = 1;
+  over = false;
+  landing = 60 + Math.random() * (width - 60);
+  level++;
+}
 
 let landing = 60 + Math.random() * (width - 60);
 let platformWidth = 50;
@@ -45,25 +66,18 @@ function text(str, x, y, s = 10) {
   ctx.fillText(str, x, y);
 }
 
-const big = 179424673 + Math.random() * 776531401;
+const stars = Array(512 * 2)
+  .fill(0)
+  .map(() => Math.max(width, height) * Math.random());
 
-function random(seed) {
-  return (big * seed ** seed) % 1;
-}
-
-function render(ticks) {
+function render() {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, width, height);
 
   ctx.fillStyle = 'white';
 
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) {
-      const u = x * height + y;
-      if (u % 23 === 0 && random(x / width) > 0.9 && random(y / height) > 0.9) {
-        ctx.fillRect(x, y, 1, 1);
-      }
-    }
+  for (let i = 0; i < stars.length; i += 2) {
+    ctx.fillRect(stars[i], stars[i + 1], 1, 1);
   }
 
   ctx.strokeStyle = 'white';
@@ -90,6 +104,7 @@ function render(ticks) {
   text(`Horz: ${(lander.vx * 100) | 0}`, width - 50, 30, 10);
   text(`Vert: ${(lander.vy * 100) | 0}`, width - 50, 40, 10);
   text(`Spin: ${lander.rot}`, width - 50, 50, 10);
+  text(`Level: ${level}`, width - 50, 60, 10);
 
   if (over) {
     text(win ? `Win! (${score} pts)` : 'Fail', width / 2, height / 2, 50);
@@ -146,11 +161,15 @@ function update() {
     win = slow && upright && onPlatform;
     const s = vel / velLimit + angle / angleLimit + dist / distLimit;
     score = Math.round(s * -33.33 + 100) + lander.fuel;
+
+    if (win) {
+      nextLevel();
+    }
   }
 
   if (keys[UP] && lander.fuel > 0) {
     thrust = maxThrust;
-    flameLength = Math.min(flameLength + 1, 13 + (ticks % 7));
+    flameLength = Math.min(flameLength + 1, 10 + (ticks % 7));
     lander.fuel--;
   } else {
     flameLength = 0;
