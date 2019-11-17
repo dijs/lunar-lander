@@ -4,7 +4,7 @@ const height = 400;
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
-const maxFuel = 800;
+const maxFuel = 1000;
 
 const lander = {
   x: 0,

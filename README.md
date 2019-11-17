@@ -4,9 +4,7 @@ I have been feeling like making games. A favorite of mine is the classic lunar l
 
 I kept it quite simple and focused on getting the movement of the ship correct rather than focusing on the landscape.
 
-### Demo
-
-<iframe style="width: 100%; height: 300px;" src="https://dijs.github.io/lunar-lander/" allowfullscreen="allowfullscreen" frameborder="0"></iframe>
+Demo is [here](https://dijs.github.io/lunar-lander/)
 
 Source is [here](https://github.com/dijs/lunar-lander)
 
