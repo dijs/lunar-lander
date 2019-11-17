@@ -6,7 +6,7 @@ I kept it quite simple and focused on getting the movement of the ship correct r
 
 ### Demo
 
-<iframe style="width: 100%; height: 500px;" src="https://dijs.github.io/lunar-lander/" allowfullscreen="allowfullscreen" frameborder="0"></iframe>
+<iframe style="width: 100%; height: 300px;" src="https://dijs.github.io/lunar-lander/" allowfullscreen="allowfullscreen" frameborder="0"></iframe>
 
 Source is [here](https://github.com/dijs/lunar-lander)
 
