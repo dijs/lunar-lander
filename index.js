@@ -13,7 +13,7 @@ let ticks = 1;
 let score = 0;
 let level = 1;
 let gravity = 0.7;
-let maxFuel = 2000;
+let maxFuel = height * 2.5; // proportionate to screen height
 
 let lander = {
   x: 0,
