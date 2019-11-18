@@ -12,52 +12,61 @@ let flameLength = 0;
 let ticks = 1;
 let score = 0;
 let level = 1;
-let gravity = 0.7;
-let maxFuel = height * 2.5; // proportionate to screen height
+let gravity = 2;
+let maxFuel = 200 + height / 7; // proportionate to screen height
+
+console.log('Height', height);
+console.log('Max Fuel', maxFuel);
 
 let lander = {
   x: 0,
   y: 50,
   w: 16,
   h: 16,
-  vx: 0.5,
+  vx: 5,
   vy: 0,
   rot: -Math.PI / 2, // 0
   fuel: maxFuel
 };
 
 const fps = 1000 / 30;
-const timeDelta = 1 / fps;
+const timeDelta = 0.1;
 const keys = {};
 const UP = 38;
 const LEFT = 37;
 const RIGHT = 39;
+const rotationDelta = 0.03;
+
 let over = false;
 let win = false;
 
-const maxThrust = 3;
+const maxThrust = 10;
 const mass = 1;
 
+function getRandomLanding() {
+  return 40 + Math.random() * (width - 40);
+}
+
 function nextLevel() {
-  maxFuel *= 0.9;
-  gravity += 0.1;
+  maxFuel *= 0.95;
+  gravity += 0.2;
   lander = {
     x: 0,
     y: 50,
     w: 16,
     h: 16,
-    vx: 0.5,
+    vx: 5,
     vy: 0,
     rot: -Math.PI / 2,
     fuel: maxFuel
   };
   ticks = 1;
   over = false;
-  landing = 60 + Math.random() * (width - 60);
+  landing = getRandomLanding();
   level++;
 }
 
-let landing = 60 + Math.random() * (width - 60);
+let landing = getRandomLanding();
 let platformWidth = 50;
 let platformHeight = 10;
 
@@ -69,6 +78,27 @@ function text(str, x, y, s = 10) {
 const stars = Array(512 * 2)
   .fill(0)
   .map(() => Math.max(width, height) * Math.random());
+
+function isLevel() {
+  return Math.abs(lander.rot) < angleLimit;
+}
+
+function getVelocityDeltaAt(time, thrustOmega = 1) {
+  const forceX = Math.sin(lander.rot) * thrust * thrustOmega;
+  const forceY = Math.cos(lander.rot) * thrust * thrustOmega;
+
+  const accX = forceX / mass;
+  const accY = -forceY / mass + gravity;
+
+  const t = time ** 2 / 2;
+
+  return {
+    vx: accX * t,
+    vy: accY * t
+  };
+}
+
+function getPositionAt() {}
 
 function render() {
   ctx.fillStyle = 'black';
@@ -104,10 +134,10 @@ function render() {
   text(`Horz: ${(lander.vx * 100) | 0}`, width - 50, 30, 10);
   text(`Vert: ${(lander.vy * 100) | 0}`, width - 50, 40, 10);
   text(`Spin: ${lander.rot}`, width - 50, 50, 10);
-  text(`Level: ${level}`, width - 50, 60, 10);
+  text(`Difficulty: ${level}`, width - 50, 60, 10);
 
   if (over) {
-    text(win ? `Win! (${score} pts)` : 'Fail', width / 2, height / 2, 50);
+    text(win ? `Win!` : 'Fail', width / 2, height / 2, 50);
   }
 
   ctx.save();
@@ -116,7 +146,7 @@ function render() {
   ctx.rotate(lander.rot);
   ctx.translate(-lander.x, -lander.y);
 
-  ctx.strokeStyle = 'white';
+  ctx.strokeStyle = isLevel() ? 'green' : 'white';
   ctx.beginPath();
   ctx.rect(lander.x - lander.w / 2, lander.y - lander.h, lander.w, lander.h);
   ctx.moveTo(lander.x - lander.w / 2, lander.y);
@@ -133,9 +163,28 @@ function render() {
   }
 
   ctx.restore();
+
+  if (level === 1) {
+    // Draw projection
+    let x = lander.x;
+    let y = lander.y;
+    let vx = lander.vx;
+    let vy = lander.vy;
+    for (let frame = 0; frame < 500; frame++) {
+      const delta = getVelocityDeltaAt(timeDelta, 0.01);
+      vx += delta.vx;
+      vy += delta.vy;
+      x += vx;
+      y += vy;
+      if (frame % 7 === 0) {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
+  }
 }
 
-const velLimit = 0.11;
+const velLimit = 0.5;
 const angleLimit = 0.11;
 const distLimit = 13;
 
@@ -151,16 +200,14 @@ function update() {
     console.log('land:', Math.abs(lander.x - landing));
 
     const vel = lander.vy + lander.vx;
-    const angle = Math.abs(lander.rot);
     const dist = Math.abs(lander.x - landing);
 
     const slow = vel < velLimit;
-    const upright = angle < angleLimit;
     const onPlatform = dist < distLimit;
 
-    win = slow && upright && onPlatform;
-    const s = vel / velLimit + angle / angleLimit + dist / distLimit;
-    score = Math.round(s * -33.33 + 100) + lander.fuel;
+    win = slow && isLevel() && onPlatform;
+    // const s = vel / velLimit + angle / angleLimit + dist / distLimit;
+    // score = Math.round(s * -33.33 + 100) + lander.fuel;
 
     if (win) {
       nextLevel();
@@ -169,35 +216,29 @@ function update() {
 
   if (keys[UP] && lander.fuel > 0) {
     thrust = maxThrust;
-    flameLength = Math.min(flameLength + 1, 10 + (ticks % 7));
+    flameLength = Math.min(flameLength + 1, 10 + (ticks % 5));
     lander.fuel--;
   } else {
     flameLength = 0;
     thrust = 0;
   }
 
-  const tx = Math.sin(lander.rot) * thrust;
-  const ty = Math.cos(lander.rot) * thrust;
+  const { vx, vy } = getVelocityDeltaAt(timeDelta);
 
-  const ax = tx / mass;
-  const ay = -ty / mass + gravity;
-
-  const t = (timeDelta * timeDelta) / 2;
-
-  lander.vx += ax * t;
-  lander.vy += ay * t;
+  lander.vx += vx;
+  lander.vy += vy;
 
   lander.x += lander.vx;
   lander.y += lander.vy;
 
-  if (keys[LEFT]) lander.rot -= 0.01;
-  if (keys[RIGHT]) lander.rot += 0.01;
+  if (keys[LEFT]) lander.rot -= rotationDelta;
+  if (keys[RIGHT]) lander.rot += rotationDelta;
 }
 
 function gameLoop() {
   update(ticks);
   render(ticks);
-  setTimeout(gameLoop);
+  requestAnimationFrame(gameLoop);
   ticks++;
 }
 
