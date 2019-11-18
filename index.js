@@ -97,6 +97,26 @@ let landing = getRandomLanding();
 let platformWidth = 50;
 let platformHeight = 10;
 
+function reset() {
+  lander = {
+    x: 0,
+    y: 50,
+    w: 16,
+    h: 16,
+    vx: 5,
+    vy: 0,
+    rot: -Math.PI / 2, // 0
+    fuel: maxFuel
+  };
+  over = false;
+  win = false;
+  landing = getRandomLanding();
+  thrust = 0;
+  flameLength = 0;
+  ticks = 1;
+  score = 0;
+}
+
 function text(str, x, y, s = 10) {
   ctx.font = s + 'px serif';
   ctx.fillText(str, x, y);
@@ -236,7 +256,13 @@ function getSlopeDelta() {
   const currentSlope = (lander.y - ny) / (lander.x - nx);
   const targetSlope =
     (lander.y - (height - platformHeight)) / (lander.x - landing);
-  return Math.abs(currentSlope - targetSlope);
+  return Math.sqrt(Math.pow(currentSlope - targetSlope, 2));
+}
+
+function distanceFromPlatform() {
+  const dx = lander.x - landing;
+  const dy = lander.y - (height - platformHeight);
+  return Math.sqrt(dx ** 2, dy ** 2);
 }
 
 const velLimit = 0.5;
@@ -246,13 +272,18 @@ const distLimit = 13;
 function update() {
   if (over) return;
 
+  if (lander.x < 0 || lander.x > canvas.width || lander.y < 0) {
+    over = true;
+    win = false;
+  }
+
   const landed = lander.y + lander.h / 2 >= height - platformHeight;
   if (landed) {
     over = true;
 
-    console.log('vel:', lander.vx + lander.vy);
-    console.log('rot:', lander.rot);
-    console.log('land:', Math.abs(lander.x - landing));
+    // console.log('vel:', lander.vx + lander.vy);
+    // console.log('rot:', lander.rot);
+    // console.log('land:', Math.abs(lander.x - landing));
 
     const vel = lander.vy + lander.vx;
     const dist = Math.abs(lander.x - landing);
@@ -290,14 +321,115 @@ function update() {
   if (keys[RIGHT]) lander.rot += rotationDelta;
 }
 
+document.addEventListener('keydown', e => (keys[e.which] = true));
+document.addEventListener('keyup', e => (keys[e.which] = false));
+
+// Actions for AI
+
+function engageThruster() {
+  keys[UP] = true;
+}
+
+function disengageThruster() {
+  keys[UP] = false;
+}
+
+function rotateLeft() {
+  keys[LEFT] = true;
+  keys[RIGHT] = false;
+}
+
+function rotateRight() {
+  keys[RIGHT] = true;
+  keys[LEFT] = false;
+}
+
+function doNothing() {
+  keys[RIGHT] = false;
+  keys[UP] = false;
+  keys[LEFT] = false;
+}
+
+const actions = {
+  0: engageThruster,
+  1: disengageThruster,
+  2: rotateLeft,
+  3: rotateRight,
+  4: doNothing
+};
+
+// agent.fromJSON(JSON.parse(data));
+
+function getState() {
+  return [
+    lander.rot / (Math.PI * 2),
+    lander.x / width,
+    lander.y / height,
+    lander.fuel / maxFuel,
+    // lander.vx,
+    // lander.vy,
+    landing / width
+    // (height - platformHeight) /
+  ];
+}
+
+// create an environment object
+const env = {};
+env.getNumStates = function() {
+  return 5;
+};
+env.getMaxNumActions = function() {
+  return 5;
+};
+
+let prevPlatformDist = 0;
+let prevLevelDist = 0;
+
+const agent = new RL.DQNAgent(env);
+
+function getReward() {
+  const platformDist = distanceFromPlatform();
+  const levelDist = Math.abs(lander.rot);
+
+  const r1 = Math.sign(prevPlatformDist - platformDist);
+  const r2 = 0; //-Math.sign(levelDist - prevLevelDist);
+  const reward = (r1 + r2) * 0.1;
+
+  prevPlatformDist = platformDist;
+  prevLevelDist = levelDist;
+
+  return reward;
+}
+
+let rewardSum = 0;
+let rewardCount = 0;
+
 function gameLoop() {
+  // AI  acts
+  actions[agent.act(getState())]();
+
   update(ticks);
+
+  // Teach AI
+  if (over) {
+    if (!win) {
+      agent.learn(-10);
+    }
+    console.log('Average Reward', rewardSum / rewardCount);
+
+    rewardSum = 0;
+    rewardCount = 0;
+    reset();
+  } else {
+    const reward = getReward();
+    rewardSum += reward;
+    rewardCount++;
+    agent.learn(reward);
+  }
+
   render(ticks);
   requestAnimationFrame(gameLoop);
   ticks++;
 }
 
 gameLoop();
-
-document.addEventListener('keydown', e => (keys[e.which] = true));
-document.addEventListener('keyup', e => (keys[e.which] = false));
