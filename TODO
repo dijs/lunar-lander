@@ -1,0 +1,5 @@
+- Teach AI to pilot with projected path
+  - Find the slope of a line from the ship to the landing site
+  - Check if pilot's action got him closer to the target slope
+
+  

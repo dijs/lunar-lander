@@ -18,6 +18,33 @@ let maxFuel = 200 + height / 7; // proportionate to screen height
 console.log('Height', height);
 console.log('Max Fuel', maxFuel);
 
+function rand(min, max) {
+  return Math.floor((max - min) * Math.random()) + min;
+}
+
+const avg = (a, b) => ((a + b) / 2) | 0;
+
+function segment(data, start, end, rmin = 0, rmax = 2) {
+  if (end - start <= 1) return;
+  const min = data[start];
+  const max = data[end];
+  const val = avg(min, max) + rand(rmin, rmax);
+  const mid = avg(start, end);
+  data[mid] += val;
+  segment(data, start, mid, rmin, rmax);
+  segment(data, mid, end, rmin, rmax);
+}
+
+function buildHeightmap(size = 1, left = 0, right = 0, rmin, rmax) {
+  const heightmap = Array(size).fill(0);
+  heightmap[0] = left;
+  heightmap[size - 1] = right;
+  segment(heightmap, 0, heightmap.length - 1, rmin, rmax);
+  return heightmap;
+}
+
+const landscape = buildHeightmap(32, 64, 64, -8, 16);
+
 let lander = {
   x: 0,
   y: 50,
@@ -110,21 +137,6 @@ function render() {
     ctx.fillRect(stars[i], stars[i + 1], 1, 1);
   }
 
-  ctx.strokeStyle = 'white';
-  ctx.beginPath();
-  const u = height - 20;
-  ctx.rect(10, 10, 20, u);
-  const e = u * (lander.fuel / maxFuel);
-  ctx.fillRect(10, 10 + u - e, 20, e);
-  ctx.stroke();
-
-  ctx.fillRect(
-    landing - platformWidth / 2,
-    height - platformHeight,
-    platformWidth,
-    platformHeight
-  );
-
   text(
     `Alt: ${(height - platformHeight - lander.y - lander.h / 2) | 0}`,
     width - 50,
@@ -140,6 +152,31 @@ function render() {
     text(win ? `Win!` : 'Fail', width / 2, height / 2, 50);
   }
 
+  // Draw landscape
+  ctx.strokeStyle = 'white';
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  const spacing = width / landscape.length;
+  ctx.moveTo(0, height - landscape[0]);
+  for (let i = 1; i < landscape.length; i++) {
+    ctx.lineTo(spacing * i, height - landscape[i]);
+  }
+  ctx.lineTo(width, height);
+  ctx.lineTo(0, height);
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw fuel
+  ctx.strokeStyle = 'white';
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  const u = height - 20;
+  ctx.rect(10, 10, 20, u);
+  const e = u * (lander.fuel / maxFuel);
+  ctx.fillRect(10, 10 + u - e, 20, e);
+  ctx.stroke();
+
+  // Draw ship
   ctx.save();
 
   ctx.translate(lander.x, lander.y);
@@ -182,6 +219,14 @@ function render() {
       }
     }
   }
+
+  ctx.fillStyle = 'white';
+  ctx.fillRect(
+    landing - platformWidth / 2,
+    height - platformHeight,
+    platformWidth,
+    platformHeight
+  );
 }
 
 const velLimit = 0.5;
