@@ -229,6 +229,16 @@ function render() {
   );
 }
 
+function getSlopeDelta() {
+  const delta = getVelocityDeltaAt(timeDelta, 0.01);
+  const nx = lander.x + lander.vx + delta.vx;
+  const ny = lander.y + lander.vy + delta.vy;
+  const currentSlope = (lander.y - ny) / (lander.x - nx);
+  const targetSlope =
+    (lander.y - (height - platformHeight)) / (lander.x - landing);
+  return Math.abs(currentSlope - targetSlope);
+}
+
 const velLimit = 0.5;
 const angleLimit = 0.11;
 const distLimit = 13;
