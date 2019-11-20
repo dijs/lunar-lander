@@ -186,9 +186,13 @@ function render() {
   );
   text(getScore() + '', width / 2, 150, 30);
 
+  const min = Math.min(...rewardsOverTime);
+  const max = Math.max(...rewardsOverTime);
+
   rewardsOverTime.forEach((reward, i) => {
     ctx.fillStyle = reward < 0 ? 'red' : 'green';
-    ctx.fillRect(width / 2 + 2 * i, 50, 2, -reward * 10);
+    const norm = (reward + min) / (max - min);
+    ctx.fillRect(width / 2 + 2 * i, 50, 2, norm * 10);
   });
 
   // Draw landscape
@@ -282,39 +286,14 @@ const MID = 1;
 const UPPER = 0;
 
 function getScore() {
-  const phase = phaseOfLanding();
-  const over = isOverPlatform();
+  // const phase = phaseOfLanding();
+
   let score = 0;
 
-  score += over ? 1 : 0;
-
-  if (phase === LOWER) {
-    score += isSlowApproach() ? 2 : -2;
-    score += isLevel() ? 2 : -2;
-    score += over ? 2 : -2;
-  }
-
-  if (movingUp() && (phase === UPPER || phase === MID)) {
-    score -= 2;
-  }
-
-  if (movingLeft()) {
-    if (isLeftOfPlatform()) {
-      score--;
-    }
-    if (isRightOfPlatform()) {
-      score++;
-    }
-  }
-
-  if (movingRight()) {
-    if (isLeftOfPlatform()) {
-      score++;
-    }
-    if (isRightOfPlatform()) {
-      score--;
-    }
-  }
+  // How level is it?
+  score -= Math.abs(lander.rot);
+  // How close to the landing site (x-axis)
+  score -= Math.abs(lander.x - landing) / (width / 2);
 
   return score;
 }
@@ -486,12 +465,11 @@ env.getMaxNumActions = function() {
 
 const agent = new RL.DQNAgent(env);
 
-// agent.fromJSON(JSON.parse(data));
-
 let prevScore = 0;
 
 function getReward() {
-  const reward = getScore();
+  const score = getScore();
+  const reward = Math.sign(score - prevScore) * 0.1;
   prevScore = score;
   return reward;
 }
@@ -503,22 +481,21 @@ function calcStateIndex() {
   return getState().reduce((sum, p, i) => sum + 2 ** i * p, 0);
 }
 
-function train() {
-  // const state = getState();
-  // actions[agent.act(parseInt(state.join(''), 2))]();
+function gameLoop() {
   actions[agent.act(calcStateIndex())]();
+
+  update(ticks);
+
   const reward = getReward();
+  // console.log(reward);
+
+  agent.learn(reward);
   rewardSum += reward;
   rewardCount++;
-  agent.learn(reward);
-}
-
-function gameLoop() {
-  update(ticks);
 
   if (over) {
     const avg = rewardSum / rewardCount;
-    // console.log('Average Reward', avg);
+    console.log('Average Reward', avg);
     rewardSum = 0;
     rewardCount = 0;
     rewardsOverTime.pop();
@@ -533,4 +510,13 @@ function gameLoop() {
 
 gameLoop();
 
-setInterval(train, 0);
+function save() {
+  localStorage.setItem('model', JSON.stringify(agent.toJSON()));
+}
+
+function load() {
+  const model = localStorage.getItem('model');
+  if (model) {
+    agent.fromJSON(JSON.parse(model));
+  }
+}
