@@ -15,6 +15,10 @@ let level = 1;
 let gravity = 2;
 let maxFuel = 10200 + height / 7; // proportionate to screen height
 
+const velLimit = 0.5;
+const angleLimit = 0.11;
+const distLimit = 13;
+
 console.log('Height', height);
 console.log('Max Fuel', maxFuel);
 
@@ -175,16 +179,19 @@ function render() {
     text(win ? `Win!` : 'Fail', width / 2, height / 2, 50);
   }
 
-  text(
-    getState()
-      .map((v, i) => (v ? states[i] : 0))
-      .filter(e => e)
-      .join(','),
-    width / 2,
-    100,
-    30
-  );
-  text(getScore() + '', width / 2, 150, 30);
+  // text(
+  //   getState()
+  //     .map((v, i) => (v ? states[i] : 0))
+  //     .filter(e => e)
+  //     .join(','),
+  //   width / 2,
+  //   100,
+  //   30
+  // );
+  text('X:' + xScore(), width / 2, 100, 20);
+  text('Y:' + yScore(), width / 2, 120, 20);
+  text('V:' + speedScore(), width / 2, 140, 20);
+  text('L:' + levelScore(), width / 2, 160, 20);
 
   const min = Math.min(...rewardsOverTime);
   const max = Math.max(...rewardsOverTime);
@@ -272,13 +279,37 @@ function render() {
   );
 }
 
-const velLimit = 0.5;
-const angleLimit = 0.11;
-const distLimit = 13;
+function getSpeed() {
+  return Math.abs(lander.vy) + Math.abs(lander.vx);
+}
 
 function isSlowApproach() {
-  const vel = lander.vy + lander.vx;
-  return vel < velLimit;
+  return getSpeed() <= velLimit;
+}
+
+function levelScore() {
+  // How level is it?
+  return -Math.abs(lander.rot) * normY();
+}
+
+function xScore() {
+  // Parabolic function to determine landing score (x-axis)
+  const distFromLanding = (landing - lander.x) / (width / 2);
+  return -(distFromLanding ** 2) + 0.1;
+}
+
+function speedScore() {
+  // How slow are we moving?
+  return -(getSpeed() - velLimit) * normY();
+}
+
+function normY() {
+  return lander.y / height;
+}
+
+function yScore() {
+  // How close are we to the landing y-axis
+  return -(height - lander.y) / height;
 }
 
 const LOWER = 2;
@@ -288,14 +319,24 @@ const UPPER = 0;
 function getScore() {
   // const phase = phaseOfLanding();
 
-  let score = 0;
+  // let score = 0;
 
   // How level is it?
-  score -= Math.abs(lander.rot);
-  // How close to the landing site (x-axis)
-  score -= Math.abs(lander.x - landing) / (width / 2);
+  // score -= Math.abs(lander.rot);
 
-  return score;
+  // Parabolic function to determine landing score (x-axis)
+  // const distFromLanding = (landing - lander.x) / (width / 2);
+  // score += -(distFromLanding ** 2) + 0.1;
+
+  // How slow are we moving?
+  // score -= getSpeed() - velLimit;
+
+  // How close are we to the landing y-axis
+  // score -= (height - lander.y) / height;
+
+  return levelScore() + xScore() + yScore() + speedScore();
+
+  // return score;
 }
 
 function update() {
@@ -418,14 +459,13 @@ function isFalling() {
 }
 
 const states = [
-  'level',
-  'slow',
-  'on_left',
-  'on_right',
+  // 'slow',
+  // 'on_left',
+  // 'on_right',
   // 'over_platform',
-  'upper',
-  'mid',
-  'lower'
+  // 'upper',
+  // 'mid',
+  // 'lower'
   // 'thrust',
   // 'moving_left',
   // 'moving_right',
@@ -434,25 +474,25 @@ const states = [
 ];
 
 function getState() {
-  const phase = phaseOfLanding();
+  // const phase = phaseOfLanding();
+  const distFromLanding = (landing - lander.x) / (width / 2);
   return [
-    isLevel() ? 1 : 0,
-    isSlowApproach() ? 1 : 0,
-    isLeftOfPlatform() ? 1 : 0,
-    isRightOfPlatform() ? 1 : 0,
-    // isOverPlatform() ? 1 : 0,
-    phase === 0 ? 1 : 0,
-    phase === 1 ? 1 : 0,
-    phase === 2 ? 1 : 0
-    // thrust > 0 ? 1 : 0,
-    // movingLeft() ? 1 : 0,
-    // movingRight() ? 1 : 0,
-    // movingUp() ? 1 : 0,
-    // isFalling() ? 1 : 0
+    lander.rot,
+    distFromLanding,
+    getSpeed(),
+    (height - lander.y) / height
+    // isLevel() ? 1 : 0,
+    // isSlowApproach() ? 1 : 0,
+    // isLeftOfPlatform() ? 1 : 0,
+    // isRightOfPlatform() ? 1 : 0,
+    // phase === 0 ? 1 : 0,
+    // phase === 1 ? 1 : 0,
+    // phase === 2 ? 1 : 0
   ];
 }
 
-const stateCount = 2 ** getState().length;
+// const stateCount = 2 ** getState().length;
+const stateCount = getState().length;
 
 // create an environment object
 const env = {};
@@ -477,23 +517,14 @@ function getReward() {
 let rewardSum = 0;
 let rewardCount = 0;
 
-function calcStateIndex() {
-  return getState().reduce((sum, p, i) => sum + 2 ** i * p, 0);
-}
-
 function gameLoop() {
-  actions[agent.act(calcStateIndex())]();
+  actions[agent.act(getState())]();
 
   update(ticks);
 
-  const reward = getReward();
-  // console.log(reward);
-
-  agent.learn(reward);
-  rewardSum += reward;
-  rewardCount++;
-
   if (over) {
+    agent.learn(-1);
+
     const avg = rewardSum / rewardCount;
     console.log('Average Reward', avg);
     rewardSum = 0;
@@ -501,10 +532,16 @@ function gameLoop() {
     rewardsOverTime.pop();
     rewardsOverTime.unshift(avg);
     reset();
+  } else {
+    const reward = getReward();
+    agent.learn(reward);
+    rewardSum += reward;
+    rewardCount++;
   }
 
   render(ticks);
   requestAnimationFrame(gameLoop);
+  // setTimeout(gameLoop, 100);
   ticks++;
 }
 
@@ -520,3 +557,11 @@ function load() {
     agent.fromJSON(JSON.parse(model));
   }
 }
+
+// function train() {
+
+// }
+
+// setInterval(train, 0);
+
+// Thought... should we use different agents for the different variables???
