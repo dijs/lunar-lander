@@ -289,7 +289,8 @@ function isSlowApproach() {
 
 function levelScore() {
   // How level is it?
-  return -Math.abs(lander.rot) * normY();
+  // return -Math.abs(lander.rot) * normY();
+  return -Math.abs(lander.rot);
 }
 
 function xScore() {
@@ -334,7 +335,8 @@ function getScore() {
   // How close are we to the landing y-axis
   // score -= (height - lander.y) / height;
 
-  return levelScore() + xScore() + yScore() + speedScore();
+  // return levelScore() + xScore() + yScore() + speedScore();
+  return levelScore() + xScore();
 
   // return score;
 }
@@ -369,6 +371,8 @@ function update() {
   }
 
   if (keys[UP] && lander.fuel > 0) {
+    // According to Pontryagin's maximum principle it's optimal to
+    // fire engine full throttle or turn it off.
     thrust = maxThrust;
     flameLength = Math.min(flameLength + 1, 10 + (ticks % 5));
     lander.fuel--;
@@ -394,12 +398,8 @@ document.addEventListener('keyup', e => (keys[e.which] = false));
 
 // Actions for AI
 
-function engageThruster() {
+function fireThruster() {
   keys[UP] = true;
-}
-
-function disengageThruster() {
-  keys[UP] = false;
 }
 
 function rotateLeft() {
@@ -419,11 +419,10 @@ function doNothing() {
 }
 
 const actions = {
-  0: engageThruster,
-  1: disengageThruster,
-  2: rotateLeft,
-  3: rotateRight,
-  4: doNothing
+  0: fireThruster,
+  1: rotateLeft,
+  2: rotateRight,
+  3: doNothing
 };
 
 function isLeftOfPlatform() {
@@ -473,14 +472,40 @@ const states = [
   // 'falling'
 ];
 
+function getShaping() {
+  const state = getState();
+  return (
+    -100 * Math.sqrt(state[0] ** 2 + state[1] ** 2) -
+    100 * Math.sqrt(state[2] ** 2 + state[3] ** 2) -
+    100 * Math.abs(state[4])
+  );
+}
+
 function getState() {
   // const phase = phaseOfLanding();
-  const distFromLanding = (landing - lander.x) / (width / 2);
+  // const distFromLanding = (landing - lander.x) / (width / 2);
+
+  // Source: https://github.com/openai/gym/blob/master/gym/envs/box2d/lunar_lander.py
   return [
-    lander.rot,
-    distFromLanding,
-    getSpeed(),
-    (height - lander.y) / height
+    // (pos.x - VIEWPORT_W/SCALE/2) / (VIEWPORT_W/SCALE/2),
+    (lander.x - width / 2) / (width / 2),
+    // (pos.y - (self.helipad_y+LEG_DOWN/SCALE)) / (VIEWPORT_H/SCALE/2),
+    lander.y / (height - platformHeight),
+    // vel.x*(VIEWPORT_W/SCALE/2)/FPS,
+    lander.vx,
+    // vel.y*(VIEWPORT_H/SCALE/2)/FPS,
+    lander.vy,
+    // self.lander.angle,
+    lander.rot
+
+    // 20.0*self.lander.angularVelocity/FPS,
+    // 1.0 if self.legs[0].ground_contact else 0.0,
+    // 1.0 if self.legs[1].ground_contact else 0.0
+
+    // lander.rot,
+    // distFromLanding
+    // getSpeed(),
+    // (height - lander.y) / height
     // isLevel() ? 1 : 0,
     // isSlowApproach() ? 1 : 0,
     // isLeftOfPlatform() ? 1 : 0,
@@ -500,15 +525,21 @@ env.getNumStates = function() {
   return stateCount;
 };
 env.getMaxNumActions = function() {
-  return 5;
+  return 4;
 };
 
-const agent = new RL.DQNAgent(env);
+const agent = new RL.DQNAgent(env, {
+  // Source: https://github.com/svpino/lunar-lander/
+  alpha: 0.001,
+  epsilon: 1.0,
+  gamma: 0.99
+});
 
 let prevScore = 0;
 
 function getReward() {
-  const score = getScore();
+  // const score = getScore();
+  const score = getShaping();
   const reward = Math.sign(score - prevScore) * 0.1;
   prevScore = score;
   return reward;
@@ -523,7 +554,7 @@ function gameLoop() {
   update(ticks);
 
   if (over) {
-    agent.learn(-1);
+    agent.learn(-100);
 
     const avg = rewardSum / rewardCount;
     console.log('Average Reward', avg);
